@@ -184,6 +184,19 @@ body {
     font-size: 1.75rem;
 }
 
+.filter-instruction {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.instruction-text {
+    color: #64748b;
+    font-size: 0.85rem;
+    font-style: italic;
+    white-space: nowrap;
+}
+
 .section-description {
     color: #64748b;
     margin-bottom: 24px;
@@ -195,6 +208,7 @@ body {
     gap: 16px;
     margin-bottom: 24px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
 .filter-group {
@@ -357,6 +371,21 @@ body {
 .badge-missing {
     background: #fef2f2;
     color: #dc2626;
+}
+
+/* Clickable badge styles */
+.clickable-badge {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clickable-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.clickable-badge:active {
+    transform: translateY(0);
 }
 
 /* Years List */
@@ -1320,6 +1349,14 @@ code, pre {
 
 .validation-message.invalid {
     color: #ef4444;
+}
+
+.validation-message.loading {
+    color: #f59e0b;
+}
+
+.validation-message.warning {
+    color: #f59e0b;
 }
 
 

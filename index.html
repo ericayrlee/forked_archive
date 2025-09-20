@@ -130,6 +130,9 @@
                             <option value="Europe">Europe</option>
                         </select>
                     </div>
+                    <div class="filter-instruction">
+                        <span class="instruction-text">*You may select an incomplete badge to submit data for the respective contest</span>
+                    </div>
                 </div>
 
                 <div class="contest-hierarchy" role="tree" id="contest-hierarchy">
@@ -491,12 +494,22 @@
         }
 
         // Create progress badges HTML
-        function createProgressBadges(progress) {
+        function createProgressBadges(progress, contestData = null, badgeContext = 'region') {
+            const createClickableBadge = (type, percentage, label) => {
+                if (percentage === 100) {
+                    return `<span class="badge ${getBadgeClass(percentage)}">${label} ${percentage}%</span>`;
+                } else {
+                    // Make badge clickable when not 100%
+                    const contestDataAttr = contestData ? ` data-contest-data='${JSON.stringify(contestData)}'` : '';
+                    return `<span class="badge ${getBadgeClass(percentage)} clickable-badge" data-badge-type="${type}" data-badge-context="${badgeContext}"${contestDataAttr}>${label} ${percentage}%</span>`;
+                }
+            };
+
             return `
-                <span class="badge ${getBadgeClass(progress.stmt)}">Stmt ${progress.stmt}%</span>
-                <span class="badge ${getBadgeClass(progress.data)}">Data ${progress.data}%</span>
-                <span class="badge ${getBadgeClass(progress.sol)}">Sol ${progress.sol}%</span>
-                <span class="badge ${getBadgeClass(progress.pkg)}">Pkg ${progress.pkg}%</span>
+                ${createClickableBadge('stmt', progress.stmt, 'Stmt')}
+                ${createClickableBadge('data', progress.data, 'Data')}
+                ${createClickableBadge('sol', progress.sol, 'Sol')}
+                ${createClickableBadge('pkg', progress.pkg, 'Pkg')}
             `;
         }
 
@@ -605,7 +618,7 @@
                         </div>
                         <div class="contest-progress">
                             <div class="progress-badges">
-                                ${createProgressBadges(subcategoryProgress)}
+                                ${createProgressBadges(subcategoryProgress, category, 'contest')}
                             </div>
                         </div>
                     `;
@@ -633,12 +646,12 @@
                         yearHeader.innerHTML = `
                             <div class="year-info">
                                 <span class="year-badge">${contest.year}</span>
-                                <span class="year-name">${contest.fullName} ${contest.year}</span>
+                                <span class="year-name">${contest.fullName}</span>
                                 <span class="year-problems">${contest.count} problems</span>
                             </div>
                             <div class="year-progress">
                                 <div class="progress-badges">
-                                    ${createProgressBadges(calculateProgress([contest]))}
+                                    ${createProgressBadges(calculateProgress([contest]), contest, 'year')}
                                 </div>
                             </div>
                         `;
@@ -683,7 +696,7 @@
             tableContainer.className = 'problem-table-wrapper';
             
             const tableTitle = document.createElement('h4');
-            tableTitle.textContent = `${contest.fullName} ${contest.year}`;
+            tableTitle.textContent = `${contest.fullName}`;
             tableTitle.style.cssText = 'margin: 0 0 16px 0; color: #020817; font-size: 1rem;';
             tableContainer.appendChild(tableTitle);
 
@@ -1129,7 +1142,7 @@
                         </div>
                         <div class="contest-progress">
                             <div class="progress-badges">
-                                ${createProgressBadges(subcategoryProgress)}
+                                ${createProgressBadges(subcategoryProgress, category, 'contest')}
                             </div>
                         </div>
                     `;
@@ -1156,12 +1169,12 @@
                         yearHeader.innerHTML = `
                             <div class="year-info">
                                 <span class="year-badge">${contest.year}</span>
-                                <span class="year-name">${contest.fullName} ${contest.year}</span>
+                                <span class="year-name">${contest.fullName}</span>
                                 <span class="year-problems">${contest.count} problems</span>
                             </div>
                             <div class="year-progress">
                                 <div class="progress-badges">
-                                    ${createProgressBadges(calculateProgress([contest]))}
+                                    ${createProgressBadges(calculateProgress([contest]), contest, 'year')}
                                 </div>
                             </div>
                         `;
@@ -1362,7 +1375,7 @@
                     filterType: 'solutions'
                 },
                 'packages': {
-                    title: 'Submit Problem Packages',
+                    title: 'Submit Packages',
                     description: 'Help us by providing complete problem packages in standard formats',
                     nextSteps: 'Select a contest above, then click the button below to request access to a GitHub repository. When you get access, add the packages to the repository.',
                     filterType: 'packages'
@@ -1386,13 +1399,17 @@
                 modalNextSteps.textContent = config.nextSteps;
 
                 
-                // Show/hide GitHub username field for test data and packages modals
+                // Show/hide GitHub username field for test data, solutions, and packages modals
                 const githubField = document.getElementById('github-username-field');
-                if (type === 'data' || type === 'packages' || type === 'solutions') {
+                if (type === 'data' || type === 'solutions' || type === 'packages') {
                     githubField.style.display = 'block';
                 } else {
                     githubField.style.display = 'none';
                 }
+
+                // Hide badge for all modals
+                const badgeContainer = document.getElementById('form-label-container');
+                badgeContainer.style.display = 'none';
 
                 // Update modal icon
                 if (modalIcons[type]) {
@@ -1405,6 +1422,98 @@
                 // Disable submit button initially
                 const submitButton = document.getElementById('modal-submit');
                 submitButton.disabled = true;
+
+                // Show modal
+                modalOverlay.classList.add('show');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            }
+
+            // Function to show modal with a specific contest pre-selected
+            function showModalWithContest(type, contest) {
+                const config = modalConfigs[type];
+                if (!config) return;
+
+                // Update modal content
+                modalTitle.textContent = config.title;
+                
+                // For problem statements modal, adjust text based on contest type
+                if (type === 'statements') {
+                    if (contest.isGeneralContest) {
+                        modalDescription.textContent = 'Help us by providing the official problem statement PDFs';
+                        modalNextSteps.textContent = 'Select a contest above, then click the button below to send the PDFs via email. Multiple PDFs may be needed for different years.';
+                    } else {
+                        modalDescription.textContent = config.description;
+                        modalNextSteps.textContent = config.nextSteps;
+                    }
+                } else {
+                    modalDescription.textContent = config.description;
+                    modalNextSteps.textContent = config.nextSteps;
+                }
+
+                // Show/hide GitHub username field for test data, solutions, and packages modals
+                const githubField = document.getElementById('github-username-field');
+                if (type === 'data' || type === 'solutions' || type === 'packages') {
+                    githubField.style.display = 'block';
+                } else {
+                    githubField.style.display = 'none';
+                }
+
+                // Hide badge for all modals
+                const badgeContainer = document.getElementById('form-label-container');
+                badgeContainer.style.display = 'none';
+
+                // Update modal icon
+                if (modalIcons[type]) {
+                    modalIcon.innerHTML = modalIcons[type];
+                }
+
+                // Populate contest select with missing items
+                populateContestSelect(config.filterType);
+
+                // Handle different types of contest selections
+                if (contest.isGeneralContest) {
+                    // For general contest selections (contest-level badges), we need to create a group option
+                    // Wait for the contest select to be populated, then add our general contest option
+                    setTimeout(() => {
+                        const contestSelect = document.getElementById('contest-select');
+                        if (contestSelect) {
+                            // Create a group option for the general contest
+                            const groupOption = document.createElement('option');
+                            groupOption.value = `group_${contest.fullName.replace(/\s+/g, '_')}_${contest.region.replace(/\s+/g, '_')}`;
+                            groupOption.textContent = `${contest.fullName} - ${contest.region}`;
+                            
+                            // Insert at the top (after the default option)
+                            contestSelect.insertBefore(groupOption, contestSelect.children[1]);
+                            
+                            // Select this option
+                            contestSelect.value = groupOption.value;
+                            
+                            // Enable submit button if this modal doesn't require GitHub username
+                            if (type !== 'data' && type !== 'solutions' && type !== 'packages') {
+                                const submitButton = document.getElementById('modal-submit');
+                                submitButton.disabled = false;
+                            }
+                        }
+                    }, 100); // Small delay to ensure populateContestSelect has finished
+                } else {
+                    // For specific year selections, find the contest key as before
+                    const contestKey = Object.keys(processedData).find(key => {
+                        const data = processedData[key];
+                        return data.fullName === contest.fullName && data.year === contest.year && data.region === contest.region;
+                    });
+
+                    if (contestKey && contestSelect.value !== contestKey) {
+                        contestSelect.value = contestKey;
+                        // For solutions and packages modals, submit button should still be disabled until GitHub username is provided
+                        if (type === 'solutions' || type === 'packages') {
+                            const submitButton = document.getElementById('modal-submit');
+                            submitButton.disabled = true;
+                        } else {
+                            const submitButton = document.getElementById('modal-submit');
+                            submitButton.disabled = false;
+                        }
+                    }
+                }
 
                 // Show modal
                 modalOverlay.classList.add('show');
@@ -1543,43 +1652,65 @@
             modalClose.addEventListener('click', hideModal);
             modalCancel.addEventListener('click', hideModal);
             
-
-            
             // Contest select change event to enable/disable submit button
             contestSelect.addEventListener('change', function() {
                 validateForm();
             });
-            
-            // GitHub username input event for validation with debouncing
-            let validationTimeout;
-            document.addEventListener('input', function(e) {
-                if (e.target.id === 'github-username') {
-                    clearTimeout(validationTimeout);
-                    validateForm();
-                    
-                    // Debounce API calls to avoid too many requests
-                    validationTimeout = setTimeout(() => {
-                        validateGitHubUsername(e.target.value);
-                    }, 500);
-                }
-            });
-            
+
             // Function to validate form and enable/disable submit button
             function validateForm() {
                 const submitButton = document.getElementById('modal-submit');
                 const contestSelected = contestSelect.value && contestSelect.value.trim() !== '';
                 
-                // For test data and packages modals, also check GitHub username
+                // For test data, solutions, and packages modals, also check GitHub username
                 const modalTitle = document.getElementById('modal-title').textContent;
-                if (modalTitle === 'Submit Test Data' || modalTitle === 'Submit Problem Packages') {
+                if (modalTitle === 'Submit Test Data' || modalTitle === 'Submit Solutions' || modalTitle === 'Submit Packages') {
                     const githubUsername = document.getElementById('github-username').value.trim();
-                    const githubUsernameInput = document.getElementById('github-username');
-                    const githubValid = githubUsername && githubUsername.length > 0 && githubUsernameInput.classList.contains('valid');
+                    const githubValid = githubUsername && githubUsername.length > 0;
                     submitButton.disabled = !(contestSelected && githubValid);
                 } else {
                     submitButton.disabled = !contestSelected;
                 }
             }
+            
+            // GitHub username blur event for validation (when user finishes typing)
+            document.addEventListener('blur', async function(e) {
+                if (e.target.id === 'github-username') {
+                    const username = e.target.value.trim();
+                    if (username) {
+                        await validateGitHubUsername(username);
+                        validateForm();
+                    }
+                }
+            }, true);
+            
+            // GitHub username input event for real-time format validation
+            document.addEventListener('input', function(e) {
+                if (e.target.id === 'github-username') {
+                    validateForm();
+                    // Only do basic format validation on input, not API call
+                    const username = e.target.value.trim();
+                    if (username) {
+                        const githubRegex = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
+                        const isValid = githubRegex.test(username);
+                        
+                        const validationMessage = document.getElementById('github-validation-message');
+                        const input = document.getElementById('github-username');
+                        
+                        if (isValid) {
+                            validationMessage.textContent = '✓ Format valid, checking GitHub...';
+                            validationMessage.className = 'validation-message valid';
+                            input.classList.remove('invalid');
+                            input.classList.add('valid');
+                        } else {
+                            validationMessage.textContent = '✗ Invalid GitHub username format';
+                            validationMessage.className = 'validation-message invalid';
+                            input.classList.remove('valid');
+                            input.classList.add('invalid');
+                        }
+                    }
+                }
+            });
             
             // Function to validate GitHub username using GitHub API
             async function validateGitHubUsername(username) {
@@ -1592,31 +1723,51 @@
                     return;
                 }
                 
+                // GitHub username validation rules
+                const githubRegex = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
+                const isValid = githubRegex.test(username);
+                
+                if (!isValid) {
+                    validationMessage.textContent = '✗ Invalid GitHub username format';
+                    validationMessage.className = 'validation-message invalid';
+                    input.classList.remove('valid');
+                    input.classList.add('invalid');
+                    return;
+                }
+                
+                // Show loading state
+                validationMessage.textContent = '⏳ Checking GitHub username...';
+                validationMessage.className = 'validation-message loading';
+                input.classList.remove('valid', 'invalid');
+                
                 try {
+                    // Check if GitHub username exists using GitHub API
                     const response = await fetch(`https://api.github.com/users/${username}`);
                     
                     if (response.ok) {
-                        input.classList.remove('invalid');
-                        input.classList.add('valid');
+                        // Username exists
                         validationMessage.textContent = '✓ Valid GitHub username';
                         validationMessage.className = 'validation-message valid';
+                        input.classList.remove('invalid');
+                        input.classList.add('valid');
                     } else if (response.status === 404) {
+                        // Username does not exist
+                        validationMessage.textContent = '✗ GitHub username does not exist';
+                        validationMessage.className = 'validation-message invalid';
                         input.classList.remove('valid');
                         input.classList.add('invalid');
-                        validationMessage.textContent = '✗ Username not found on GitHub';
-                        validationMessage.className = 'validation-message invalid';
                     } else {
+                        // API error
+                        validationMessage.textContent = '⚠ Unable to verify username (API error)';
+                        validationMessage.className = 'validation-message warning';
                         input.classList.remove('valid', 'invalid');
-                        validationMessage.textContent = '⚠ Unable to validate username';
-                        validationMessage.className = 'validation-message';
                     }
                 } catch (error) {
+                    // Network error
+                    validationMessage.textContent = '⚠ Unable to verify username (network error)';
+                    validationMessage.className = 'validation-message warning';
                     input.classList.remove('valid', 'invalid');
-                    validationMessage.textContent = '⚠ Network error - unable to validate';
-                    validationMessage.className = 'validation-message';
                 }
-                
-                validateForm();
             }
             
             // Close modal when clicking overlay
@@ -1652,16 +1803,8 @@
                     const contestName = groupParts[0];
                     const region = groupParts.slice(1).join('_'); // Handle regions with underscores
                     
-                    // Find the original contest data to get the proper display name
-                    const originalContest = Object.values(processedData).find(c => 
-                        c.fullName === contestName && c.region === region
-                    );
-                    
-                    if (originalContest) {
-                        displayName = `${originalContest.fullName} - ${originalContest.region}`;
-                    } else {
-                        displayName = `${contestName} - ${region}`;
-                    }
+                    // For group selections, use the contest name and region directly
+                    displayName = `${contestName} - ${region}`;
                 } else {
                     // Get the contest data for individual year selections
                     const contest = processedData[selectedContestKey];
@@ -1688,15 +1831,15 @@
                     const mailtoLink = `mailto:fredrik@icpc.global?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
                     window.open(mailtoLink);
                 } else if (modalTitle === 'Submit Solutions') {
-                    // Create mailto link for problem packages
+                    // Create mailto link for solutions
                     const githubUsername = document.getElementById('github-username').value.trim();
-                    const subject = `Solutions for ${displayName}`;
+                    const subject = `Problem Solutions for ${displayName}`;
                     const body = `GitHub username: ${githubUsername}`;
                     
                     const mailtoLink = `mailto:fredrik@icpc.global?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
                     window.open(mailtoLink);
-                } else if (modalTitle === 'Submit Problem Packages') {
-                    // Create mailto link for problem packages
+                } else if (modalTitle === 'Submit Packages') {
+                    // Create mailto link for packages
                     const githubUsername = document.getElementById('github-username').value.trim();
                     const subject = `Problem Packages for ${displayName}`;
                     const body = `GitHub username: ${githubUsername}`;
@@ -1726,6 +1869,72 @@
                         showModal('packages');
                     } else if (buttonText.includes('create packages')) {
                         showModal('create-packages');
+                    }
+                }
+            });
+
+            // Add click event listeners to progress badges
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('clickable-badge')) {
+                    const badgeType = e.target.getAttribute('data-badge-type');
+                    const badgeContext = e.target.getAttribute('data-badge-context');
+                    const contestData = e.target.getAttribute('data-contest-data');
+                    
+                    if (contestData) {
+                        const contest = JSON.parse(contestData);
+                        let modalType = '';
+                        
+                        // Map badge types to modal types
+                        if (badgeType === 'stmt') {
+                            modalType = 'statements';
+                        } else if (badgeType === 'data') {
+                            modalType = 'data';
+                        } else if (badgeType === 'sol') {
+                            modalType = 'solutions';
+                        } else if (badgeType === 'pkg') {
+                            // For packages, check if all other components are complete
+                            if (badgeContext === 'year') {
+                                // For individual year, check if stmt, data, and sol are all 100%
+                                const progress = calculateProgress([contest]);
+                                if (progress.stmt === 100 && progress.data === 100 && progress.sol === 100) {
+                                    modalType = 'create-packages';
+                                } else {
+                                    modalType = 'packages';
+                                }
+                            } else if (badgeContext === 'contest') {
+                                // For contest level, check if all years have complete stmt, data, and sol
+                                const allYearsComplete = contest.contests.every(c => {
+                                    const yearProgress = calculateProgress([c]);
+                                    return yearProgress.stmt === 100 && yearProgress.data === 100 && yearProgress.sol === 100;
+                                });
+                                if (allYearsComplete) {
+                                    modalType = 'create-packages';
+                                } else {
+                                    modalType = 'packages';
+                                }
+                            } else {
+                                // For region level, default to packages
+                                modalType = 'packages';
+                            }
+                        }
+                        
+                        if (modalType) {
+                            // For contest-level badges, we need to create a special contest object
+                            // that represents the general contest (not a specific year)
+                            if (badgeContext === 'contest') {
+                                // Create a general contest object for the modal
+                                const generalContest = {
+                                    fullName: contest.fullName,
+                                    region: contest.contests[0]?.region || 'Unknown',
+                                    year: null, // No specific year
+                                    isGeneralContest: true,
+                                    contestCategory: contest
+                                };
+                                showModalWithContest(modalType, generalContest);
+                            } else {
+                                showModalWithContest(modalType, contest);
+                            }
+                        }
                     }
                 }
             });
